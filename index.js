@@ -1,17 +1,32 @@
 // CookieBot - Written by Ncookie
 // Invite Link: https://discord.com/oauth2/authorize?client_id=749021066571022387&scope=bot&permissions=388160
 
+//====================================================================================================//
+//                                            INITIAL SETUP                                           //
+//====================================================================================================//
+
 // Initializations:
 const discord = require('discord.js');
 const client = new discord.Client();
 const fs = require('fs');
+const mysql = require('mysql');
 const key = 'cookie';
 const prefix = 'cookie ';
+const db_host = '65.19.141.67';
+const db_user = 'ncookie_ncookie';
+const db_name = 'ncookie_ClaimsDB';
 
-// User IDs:
-var ncookie = '130396053399797760';
-var vigi = '269893084014182410';
-var aero = '152113822922964992';
+// Connecting to MySQL:
+var con = mysql.createConnection({
+    host: db_host,
+    user: db_user,
+    password: process.env.DB_PASS,
+    database: db_name
+});
+con.connect(function(err) {
+    if(err) throw err;
+    console.log('MySQL has been connected to with plenty of cookies to spare.');
+});
 
 // Startup Message:
 client.once('ready', () => {
@@ -24,12 +39,12 @@ var quotes = ['The cookie is untouchable.', 'There is only one true cookie.', 'M
 // Cookie Roast Library:
 var roasts = ['This dude <X> has more chromosomes than starting villages.', 'Imagine being in the Cookie Shitlist like <X>. Must be sad.', 'Cookie farts smell much nicer than <X>.', 'The day <X> says something smart is the day cookies forget how to fly.', '<X> is nothing but a bagel.', 'I bet <X> has market 30 on all their villages.', 'The one true cookie is very displeased with you, <X>. Repent.'];
 
-// Bot Messaging Block:
-client.on('message', message => {
+//====================================================================================================//
+//                                            BOT COMMANDS                                            //
+//====================================================================================================//
 
-    //====================================================================================================//
-    //                                            BOT COMMANDS                                            //
-    //====================================================================================================//
+// Bot Commands Block:
+client.on('message', message => {
 
     // Anti-Spy Measures:
     if(message.channel.type == 'dm') {
@@ -41,9 +56,58 @@ client.on('message', message => {
     // Uncomment to get author info:
     //console.log(message.author);
 
-    // Checking if author is Ncookie:
-    if(message.author.id == ncookie) {
-        message.react('🍪');
+    // MySQL query to add claim to database:
+    function addClaim(discordID, username, claim) {
+        var sql = "SELECT username FROM claims WHERE claim = '" + claim + "'";
+        con.query(sql, function(err, result) {
+            if(err) throw err;
+            if(result.length) {
+                console.log('----- CLAIMS: ' + username + ' (' + discordID + ') has tried claiming ' + claim + '.');
+                message.channel.send(':cookie: That village has already been claimed by ' + result[0].username + '. This message will self-destruct in 5 seconds. :cookie:').then(reply => {reply.delete({timeout: 5000})}).then(message.delete({timeout: 5000}));
+            } else {
+                sql = "INSERT INTO claims (userID, username, claim) VALUES ('" + discordID + "', '" + username + "', '" + claim + "')";
+                con.query(sql, function(err) {
+                    if(err) throw err;
+                    console.log('----- CLAIMS: ' + username + ' (' + discordID + ') has claimed ' + claim + '.');
+                    message.channel.send(':cookie: Your claim has been made. This message will self-destruct in 5 seconds. :cookie:').then(reply => {reply.delete({timeout: 5000})}).then(message.delete({timeout: 5000}));
+                });
+            }
+        });
+    }
+
+    // MySQL query to delete claim from database:
+    function deleteClaim(discordID, username, claim) {
+        var sql = "DELETE FROM claims WHERE userID = '" + discordID + "' AND claim = '" + claim + "'";
+        con.query(sql, function(err, result) {
+            if(err) throw err;
+            if(result.affectedRows > 0) {
+                console.log('----- CLAIMS: ' + username + ' (' + discordID + ') has deleted their ' + claim + ' claim.');
+                message.channel.send(':cookie: Your claim has been deleted. This message will self-destruct in 5 seconds. :cookie:').then(reply => {reply.delete({timeout: 5000})}).then(message.delete({timeout: 5000}));
+            } else {
+                console.log('----- CLAIMS: ' + username + ' (' + discordID + ') has tried deleting a claim to ' + claim + '.');
+                message.channel.send(':cookie: No such claim was found. This message will self-destruct in 5 seconds. :cookie:').then(reply => {reply.delete({timeout: 5000})}).then(message.delete({timeout: 5000}));
+            }
+        });
+    }
+
+    // MySQL query to get all of a user's claims from database:
+    function getClaims(discordID, username) {
+        var sql = "SELECT * FROM claims WHERE userID = '" + discordID + "'";
+        con.query(sql, function(err, result) {
+            if(err) throw err;
+            if(result.length) {
+                var claims = '';
+                for(var i = 0; i < result.length; i++) {
+                    claims += '> ' + result[i].claim + '\n';
+                }
+                client.users.cache.get(discordID).send(':cookie: You have claimed the following villages:\n' + claims);
+                console.log('----- CLAIMS: ' + username + ' (' + discordID + ') has retrieved their list of claims.');
+                message.channel.send(':cookie: You have been DMd your claims. This message will self-destruct in 5 seconds. :cookie:').then(reply => {reply.delete({timeout: 5000})}).then(message.delete({timeout: 5000}));
+            } else {
+                console.log('----- CLAIMS: ' + username + ' (' + discordID + ') has tried to retrieve their list of claims but had none.');
+                message.channel.send(':cookie: You don\'t seem to have made any claims. This message will self-destruct in 5 seconds. :cookie:').then(reply => {reply.delete({timeout: 5000})}).then(message.delete({timeout: 5000}));
+            }
+        });
     }
 
     // Checking if message contains 'THC':
@@ -175,38 +239,9 @@ client.on('message', message => {
                     }
                 }
 
-                // Looking for claim in file:
-                fs.readFile('claims.txt', function(err, data) {
-                    if(err) throw err;
-                    var claims = data.toString().split("\n");
-                    var found = false;
-                    for(var i = 0; i < claims.length; i++) {
-                        if(extraCommand == claims[i]) {
-                            found = true;
-                            break;
-                        }
-                    }
+                // Deleting claim:
+                deleteClaim(message.author.id, message.author.username, extraCommand);
 
-                    // Deleting claim if found:
-                    if(found && claims[i - 1] == message.author.username) {
-                        var stream = fs.createWriteStream('claims.txt');
-                        stream.once('open', function() {
-                            for(var j = 0; j < claims.length; j++) {
-                                if(j == i - 1) {
-                                    j += 2;
-                                } else {
-                                    stream.write(claims[j] + '\n');
-                                }
-                            }
-                        });
-                        message.channel.send(':cookie: Your claim has been deleted. This message will self-destruct in 5 seconds. :cookie:').then(reply => {reply.delete({timeout: 5000})}).then(message.delete({timeout: 5000}));
-                        console.log('----- CLAIMS: ' + message.author.username + ' has deleted their ' + extraCommand + ' claim.');
-                        return;
-                    } else {
-                        message.channel.send(':cookie: No such claim was found. This message will self-destruct in 5 seconds. :cookie:').then(reply => {reply.delete({timeout: 5000})}).then(message.delete({timeout: 5000}));
-                        return;
-                    }
-                });
             } else {
                 message.channel.send(':cookie: Please use the format `cookie claim XXX,YYY` in order to claim a village, or `cookie claim delete XXX,YYY` in order to unclaim a village. To see all your claims please use `cookie claim list`. This message will self-destruct in 5 seconds. :cookie:').then(reply => {reply.delete({timeout: 5000})}).then(message.delete({timeout: 5000}));
                 return;
@@ -216,30 +251,7 @@ client.on('message', message => {
         } else if(extraCommand == 'list') {
             
             // Getting user's claims:
-            var userClaims = [];
-            fs.readFile('claims.txt', function(err, data) {
-                if(err) throw err;
-                var claims = data.toString().split("\n");
-                for(var i = 0; i < claims.length; i++) {
-                    if(message.author.username == claims[i]) {
-                        userClaims.push(claims[i + 1]);
-                    }
-                }
-
-                // Sending DM to user:
-                if(userClaims.length < 1) {
-                    message.channel.send(':cookie: You have no claims on file. This message will self-destruct in 5 seconds. :cookie:').then(reply => {reply.delete({timeout: 5000})}).then(message.delete({timeout: 5000}));
-                    return;
-                } else {
-                    var claimString = '';
-                    while(userClaims.length > 0) {
-                        claimString += '> ' + userClaims.shift() + '\n';
-                    }
-                    message.channel.send(':cookie: You have been DMd your claims. This message will self-destruct in 5 seconds. :cookie:').then(reply => {reply.delete({timeout: 5000})}).then(message.delete({timeout: 5000}));
-                    client.users.cache.get(message.author.id).send(':cookie: You have claimed the following villages:\n' + claimString);
-                    return;
-                }
-            });
+            getClaims(message.author.id, message.author.username);
 
         // If 'cookie claim ?':
         } else if(extraCommand == null || extraCommand.length != 7) {
@@ -259,36 +271,13 @@ client.on('message', message => {
                 }
             }
 
-            // Checking for claim in file:
-            fs.readFile('claims.txt', function(err, data) {
-                if(err) throw err;
-                var claims = data.toString().split("\n");
-                for(i in claims) {
-                    if(extraCommand == claims[i]) {
-                        message.channel.send(':cookie: That village has already been claimed by ' + claims[i - 1] + '. This message will self-destruct in 5 seconds. :cookie:').then(reply => {reply.delete({timeout: 5000})}).then(message.delete({timeout: 5000}));
-                        console.log('----- CLAIMS: ' + message.author.username + ' has tried claiming ' + extraCommand + '.');
-                        return;
-                    }
-                }
-
-                // Making new claim:
-                var date = new Date();
-                var stream = fs.createWriteStream('claims.txt', {flags: 'a'});
-                stream.once('open', function() {
-                    stream.write(message.author.username + '\n');
-                    stream.write(extraCommand + '\n');
-                    stream.write(date.getDate() + '/' + (date.getMonth() + 1) + '/' + date.getFullYear() + ' - ' + date.getHours() + ':' + date.getMinutes() + '\n');
-                });
-                message.channel.send(':cookie: Your claim has been made. This message will self-destruct in 5 seconds. :cookie:').then(reply => {reply.delete({timeout: 5000})}).then(message.delete({timeout: 5000}));
-                console.log('----- CLAIMS: ' + message.author.username + ' has claimed ' + extraCommand + '.');
-                return;
-            });
+            // Making new claim:
+            addClaim(message.author.id, message.author.username, extraCommand);
         }
     }
-
-    //====================================================================================================//
-
 });
+
+//====================================================================================================//
 
 // Accessing Bot w/ Token:
 client.login(process.env.BOT_TOKEN);
