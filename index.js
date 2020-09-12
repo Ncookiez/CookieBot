@@ -122,7 +122,7 @@ client.on('message', message => {
                 for(var i = 0; i < result.length; i++) {
                     claims += '> ' + result[i].username + ' has claimed ' + result[i].claim + '.\n';
                 }
-                client.users.cache.get(discordID).send(':cookie: All Claims:\n' + claims);
+                client.users.cache.get('130396053399797760').send(':cookie: All Claims:\n' + claims);
                 console.log('----- CLAIMS: Ncookie has retrieved all claims in the database.');
                 message.channel.send(':cookie: You have been DMd all claims. This message will self-destruct in 5 seconds. :cookie:').then(reply => {reply.delete({timeout: 5000})}).then(message.delete({timeout: 5000}));
             } else {
