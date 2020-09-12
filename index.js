@@ -58,7 +58,8 @@ client.on('message', message => {
 
     // MySQL query to add claim to database:
     function addClaim(discordID, username, claim) {
-        var sql = "SELECT username FROM claims WHERE claim = '" + claim + "'";
+        sqlClaim = claim.substring(0, 3) + '_' + claim.substring(4);
+        var sql = "SELECT username FROM claims WHERE claim LIKE '" + sqlClaim + "'";
         con.query(sql, function(err, result) {
             if(err) throw err;
             if(result.length) {
@@ -77,7 +78,8 @@ client.on('message', message => {
 
     // MySQL query to delete claim from database:
     function deleteClaim(discordID, username, claim) {
-        var sql = "DELETE FROM claims WHERE userID = '" + discordID + "' AND claim = '" + claim + "'";
+        sqlClaim = claim.substring(0, 3) + '_' + claim.substring(4);
+        var sql = "DELETE FROM claims WHERE userID = '" + discordID + "' AND claim LIKE '" + sqlClaim + "'";
         con.query(sql, function(err, result) {
             if(err) throw err;
             if(result.affectedRows > 0) {
