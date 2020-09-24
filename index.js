@@ -8,7 +8,6 @@
 // Initializations:
 const discord = require('discord.js');
 const client = new discord.Client();
-const fs = require('fs');
 const mysql = require('mysql');
 const key = 'cookie';
 const prefix = 'cookie ';
@@ -31,7 +30,37 @@ con.connect(function(err) {
 // Startup Message:
 client.once('ready', () => {
     console.log('CookieBot is ready to deliver the goods.');
+
+    // MySQL query to check and delete elapsed claims:
+    function checkClaims() {
+        var date = new Date();
+        date.setDate(new Date().getDate() - 3);
+        var sql = "SELECT * FROM claims WHERE time < '" + date.toISOString().slice(0, 19).replace('T', ' ') + "'";
+        con.query(sql, function(err, result) {
+            if(err) throw err;
+            if(result.length) {
+                for(var i = 0; i < result.length; i++) {
+                    sql = "DELETE FROM claims WHERE claim LIKE '" + result[i].claim + "'";
+                    con.query(sql, function(err, result) {
+                        if(err) throw err;
+                        if(result.affectedRows < 1) {
+                            console.log('ERROR WHILE DELETING ELAPSED CLAIMS');
+                        }
+                    });
+                    client.users.cache.get(result[i].userID).send(':cookie: Your claim to ' + result[i].claim + ' has expired. It can now be claimed by others.');
+                    console.log('----- CLAIMS: Claim ' + result[i].claim + ' from ' + result[i].username + ' has been invalidated.');
+                }
+            } else {
+                console.log('----- CLAIMS: No claims invalidated during startup.');
+            }
+        });
+    }
+
+    // Checking for elapsed claims on startup (runs at least once a day):
+    checkClaims();
+
 });
+
 
 // Cookie Bible Quotes Library:
 var quotes = ['The cookie is untouchable.', 'There is only one true cookie.', 'May the cookies reign supreme.', 'To dip in milk is life\'s true pleasures.', 'It is the king of the bakery.', 'Its chips can melt your soul.', 'Its crunch deafening - its sight rivetting.', 'The only choice is surrender.', 'The cookie cannot be stopped.', 'The chips made of the highest quality chocolate touch our tongues and hearts with gentleness.', 'The cookie has a hatred for bagels.'];
@@ -66,7 +95,7 @@ client.on('message', message => {
                 console.log('----- CLAIMS: ' + username + ' (' + discordID + ') has tried claiming ' + claim + '.');
                 message.channel.send(':cookie: That village has already been claimed by ' + result[0].username + '. This message will self-destruct in 5 seconds. :cookie:').then(reply => {reply.delete({timeout: 5000})}).then(message.delete({timeout: 5000}));
             } else {
-                sql = "INSERT INTO claims (userID, username, claim) VALUES ('" + discordID + "', '" + username + "', '" + claim + "')";
+                sql = "INSERT INTO claims (userID, username, claim, time) VALUES ('" + discordID + "', '" + username + "', '" + claim + "', '" + new Date().toISOString().slice(0, 19).replace('T', ' ') + "')";
                 con.query(sql, function(err) {
                     if(err) throw err;
                     console.log('----- CLAIMS: ' + username + ' (' + discordID + ') has claimed ' + claim + '.');
@@ -119,10 +148,17 @@ client.on('message', message => {
             if(err) throw err;
             if(result.length) {
                 var claims = '';
+                client.users.cache.get('130396053399797760').send(':cookie: All Claims:');
                 for(var i = 0; i < result.length; i++) {
                     claims += '> ' + result[i].username + ' has claimed ' + result[i].claim + '.\n';
+                    if(claims.length > 1500) {
+                        client.users.cache.get('130396053399797760').send(claims);
+                        claims = '';
+                    }
                 }
-                client.users.cache.get('130396053399797760').send(':cookie: All Claims:\n' + claims);
+                if(claims.length) {
+                    client.users.cache.get('130396053399797760').send(claims);
+                }
                 console.log('----- CLAIMS: Ncookie has retrieved all claims in the database.');
                 message.channel.send(':cookie: You have been DMd all claims. This message will self-destruct in 5 seconds. :cookie:').then(reply => {reply.delete({timeout: 5000})}).then(message.delete({timeout: 5000}));
             } else {
@@ -225,11 +261,11 @@ client.on('message', message => {
 
     // Command: 'cookie roast':
     if(command === 'roast') {
-        var extraCommand = args.shift();
+        var extraCommand = args.shift().toLowerCase();
         var roastee = '';
         if(extraCommand == null) {
             roastee = 'THC';
-        } else if(extraCommand == 'cookie' || extraCommand == 'ncookie') {
+        } else if(extraCommand == 'cookie' || extraCommand == 'ncookie' || extraCommand == 'cookiebot') {
             roastee = message.author.username;
         } else {
             roastee = extraCommand;
@@ -249,7 +285,7 @@ client.on('message', message => {
 
             // Checking for invalid coordinates:
             if(extraCommand == null) {
-                message.channel.send(':cookie: Please use the format `cookie claim XXX,YYY` in order to claim a village, or `cookie claim delete XXX,YYY` in order to unclaim a village. To see all your claims please use `cookie claim list`. This message will self-destruct in 5 seconds. :cookie:').then(reply => {reply.delete({timeout: 5000})}).then(message.delete({timeout: 5000}));
+                message.channel.send(':cookie: Please use the format `cookie claim XXX,YYY` in order to claim a village, or `cookie claim delete XXX,YYY` in order to unclaim a village. To see all your claims please use `cookie claim list`. This message will self-destruct in 15 seconds. :cookie:').then(reply => {reply.delete({timeout: 15000})}).then(message.delete({timeout: 15000}));
                 return;
             } else if(extraCommand.length == 7) {
                 for(var i = 0; i < 7; i++) {
@@ -265,7 +301,7 @@ client.on('message', message => {
                 deleteClaim(message.author.id, message.author.username, extraCommand);
 
             } else {
-                message.channel.send(':cookie: Please use the format `cookie claim XXX,YYY` in order to claim a village, or `cookie claim delete XXX,YYY` in order to unclaim a village. To see all your claims please use `cookie claim list`. This message will self-destruct in 5 seconds. :cookie:').then(reply => {reply.delete({timeout: 5000})}).then(message.delete({timeout: 5000}));
+                message.channel.send(':cookie: Please use the format `cookie claim XXX,YYY` in order to claim a village, or `cookie claim delete XXX,YYY` in order to unclaim a village. To see all your claims please use `cookie claim list`. This message will self-destruct in 15 seconds. :cookie:').then(reply => {reply.delete({timeout: 15000})}).then(message.delete({timeout: 15000}));
                 return;
             }
 
@@ -287,7 +323,7 @@ client.on('message', message => {
 
         // If 'cookie claim ?':
         } else if(extraCommand == null || extraCommand.length != 7) {
-            message.channel.send(':cookie: Please use the format `cookie claim XXX,YYY` in order to claim a village, or `cookie claim delete XXX,YYY` in order to unclaim a village. To see all your claims please use `cookie claim list`. This message will self-destruct in 5 seconds. :cookie:').then(reply => {reply.delete({timeout: 5000})}).then(message.delete({timeout: 5000}));
+            message.channel.send(':cookie: Please use the format `cookie claim XXX,YYY` in order to claim a village, or `cookie claim delete XXX,YYY` in order to unclaim a village. To see all your claims please use `cookie claim list`. This message will self-destruct in 15 seconds. :cookie:').then(reply => {reply.delete({timeout: 15000})}).then(message.delete({timeout: 15000}));
             return;
 
         // If 'cookie claim xxx,yyy':
