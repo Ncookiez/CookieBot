@@ -168,6 +168,20 @@ client.on('message', message => {
         });
     }
 
+    // MySQL query to delete all null claim from database <TODO>:
+    function deleteNullClaims() {
+        // Need select statement to send messages to users before deleting. <TODO>
+        var sql = "DELETE FROM claims WHERE time = 'null'";
+        con.query(sql, function(err, result) {
+            if(err) throw err;
+            if(result.affectedRows > 0) {
+                // <TODO>
+            } else {
+                console.log('----- CLAIMS: No null claims have been found to delete.');
+            }
+        });
+    }
+
     // Checking if message contains 'THC':
     if(!message.author.bot && message.content.toLowerCase().includes('thc')) {
         message.react('🤮');
@@ -317,6 +331,16 @@ client.on('message', message => {
             // Getting all claims from database:
             if(message.author.id == '130396053399797760') {
                 getAllClaims();
+            } else {
+                message.channel.send(':cookie: You don\'t have permission to use this command. This message will self-destruct in 5 seconds. :cookie:').then(reply => {reply.delete({timeout: 5000})}).then(message.delete({timeout: 5000}));
+            }
+        
+        // If 'cookie claim dbclean':
+        } else if(extraCommand == 'dbclean') {
+
+            // Getting all claims from database:
+            if(message.author.id == '130396053399797760') {
+                deleteNullClaims();
             } else {
                 message.channel.send(':cookie: You don\'t have permission to use this command. This message will self-destruct in 5 seconds. :cookie:').then(reply => {reply.delete({timeout: 5000})}).then(message.delete({timeout: 5000}));
             }
