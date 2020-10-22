@@ -14,12 +14,14 @@ const prefix = 'cookie ';
 const db_host = '65.19.141.67';
 const db_user = 'ncookie_ncookie';
 const db_name = 'ncookie_ClaimsDB';
+var con;
+var claimsChecked = false;
 
 // MySQL Connection Setup:
-function dbConnect() {
+function dbConnect(callback) {
 
     // Creating Connection:
-    var con = mysql.createConnection({
+    con = mysql.createConnection({
         host: db_host,
         user: db_user,
         password: process.env.DB_PASS,
@@ -33,7 +35,7 @@ function dbConnect() {
     });
     
     // Handling Idle Timeouts:
-    connection.on('error', function(err) {
+    con.on('error', function(err) {
         if(err.code === 'PROTOCOL_CONNECTION_LOST') {
             console.log('MySQL connection dropped. Attempting to reconnect...');
             dbConnect();
@@ -41,12 +43,19 @@ function dbConnect() {
             throw err;
         }
     });
+
+    // Checking for elapsed claims on startup (runs at least once a day):
+    if(!claimsChecked) {
+        claimsChecked = true;
+        callback();
+    }
+
 }
-dbConnect();
 
 // Startup Message:
 client.once('ready', () => {
     console.log('CookieBot is ready to deliver the goods.');
+    dbConnect(checkClaims);
 
     // MySQL query to check and delete elapsed claims:
     function checkClaims() {
@@ -73,11 +82,7 @@ client.once('ready', () => {
         });
     }
 
-    // Checking for elapsed claims on startup (runs at least once a day):
-    checkClaims();
-
 });
-
 
 // Cookie Bible Quotes Library:
 var quotes = ['The cookie is untouchable.', 'There is only one true cookie.', 'May the cookies reign supreme.', 'To dip in milk is life\'s true pleasures.', 'It is the king of the bakery.', 'Its chips can melt your soul.', 'Its crunch deafening - its sight rivetting.', 'The only choice is surrender.', 'The cookie cannot be stopped.', 'The chips made of the highest quality chocolate touch our tongues and hearts with gentleness.', 'The cookie has a hatred for bagels.'];
